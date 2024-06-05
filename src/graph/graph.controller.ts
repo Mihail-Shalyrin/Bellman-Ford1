@@ -16,7 +16,7 @@ export class GraphController {
     return { success: true };
   }
   @Get('bellman-ford')
-  async runBellmanFord(@Query('source') source: string) {
+  runBellmanFord(@Query('source') source: string) {
     return this.graphService.getDistances(+source);
     
   }
