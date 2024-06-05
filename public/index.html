@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Graph Visualization</title>
+  <style>
+
+    #cy {
+      width: 70%;
+      height: 600px;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <div style="display:flex;  gap: 10px;">
+    <div >
+        <form id="node-form"> 
+          <button type="submit">Add Node</button>
+        </form>
+    
+    </div >
+   
+      
+        <div >   
+      
+          <form id="edge-form">
+           
+              <label for="edge-from">From:</label>
+              <input type="text" id="edge-from" name="edge-from" required>
+              <label for="edge-to">To:</label>
+              <input type="text" id="edge-to" name="edge-to" required>
+              <label for="edge-weight">Weight:</label>
+              <input type="text" id="edge-weight" name="edge-weight" required>
+              <button type="submit">Add Edge</button>
+          </form>
+      
+   
+        </div>
+       
+        <div >
+                <button id="delete-graph">Delete Graph</button>
+        </div>
+        <div >
+                  <form id="DistationsForm">
+                    <label for="Point">Point:</label>
+                    <input type="text" id="source-node" name="edge-from" required>      
+                    <button type="submit">Find Distations</button>
+                </form>
+    
+        </div>
+      
+  
+  
+ </div>
+
+
+
+<div style="display:flex; width:100%" >
+  <div id="cy" ></div>
+
+    
+    <div id="result-container" style="height: 300px; width:30%; overflow-y: auto;">
+     
+       
+        <table id="distances-table">
+          <thead>
+            <tr>
+              <th>Точка</th>
+              <th>Расстояние</th>
+            </tr>
+          </thead>
+          <tbody>
+          </tbody>
+        </table>
+      
+      </div>
+ 
+</div>
+  
+  
+  <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+  
+  <script>
+ 
+document.getElementById('DistationsForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const sourceNode = document.getElementById('source-node').value;
+  const response = await fetch(`/graph/bellman-ford?source=${sourceNode}`);
+  const data = await response.json();
+  if (data.error) {
+    alert(data.error);
+    return;
+  }
+  
+  const distancesTable = document.getElementById('distances-table');
+  distancesTable.innerHTML = ''; 
+
+  const headerRow = distancesTable.insertRow();
+  const headerCell1 = headerRow.insertCell(0);
+  const headerCell2 = headerRow.insertCell(1);
+  headerCell1.textContent = 'Точка';
+  headerCell2.textContent = 'Расстояние';
+
+  data.forEach((distance, index) => {
+    
+      const newRow = distancesTable.insertRow();
+      const pointCell = newRow.insertCell(0);
+      const distanceCell = newRow.insertCell(1);
+      pointCell.textContent = sourceNode + ' -> ' + (index + 1);
+      distanceCell.textContent = distance === null ? '∞' : distance;
+    
+  });
+});
+ 
+ 
+
+ async function deleteGraph() {
+      const response = await fetch('/graph/delete', {
+        method: 'DELETE' 
+      });
+     
+      const result = await response.json();
+      currentNodeId = 0
+      console.log('Graph deleted:', result);
+      renderGraph(); 
+    }
+
+    document.getElementById('delete-graph').addEventListener('click', async () => {
+      await deleteGraph();
+    });
+
+
+    async function fetchGraphData() {
+      const response = await fetch('/graph');
+      const data = await response.json(); 
+      console.log('Fetched graph data:', data);
+      return data;
+
+    }
+    async function addNode(node) {
+      const response = await fetch('/graph/node', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(node)
+      });
+      const result = await response.json();
+      console.log('Node added:', result);
+    }
+
+    async function addEdge(edge) {
+      const response = await fetch('/graph/edge', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(edge)
+      });
+      const result = await response.json();
+      if (result.success)
+      {
+        console.log('Edge added:', result);
+      }
+      else {
+        alert('Ошибка при добавлении ребра в граф.');
+        console.log('error')}
+     
+    }
+
+    async function renderGraph() {
+      const graphData = await fetchGraphData();
+
+      const cy = cytoscape({
+        container: document.getElementById('cy'),
+        elements: [
+          ...graphData.nodes.map(node => ({
+            data: { id: node.id, label: node.id}
+          })),
+          ...graphData.edges.map(edge => ({
+            data: { source: edge.from, target: edge.to, label: ` ${edge.weight}` }
+          }))
+        ],
+        style: [
+          {
+            selector: 'node',
+            style: {
+              'label': 'data(label)',
+              'text-valign': 'center',
+              'color': '#000',
+              'background-color': '#00f'
+            }
+          },
+          {
+            selector: 'edge',
+            style: {
+              'label': 'data(label)',
+              'width': 3,
+              'line-color': '#ccc',
+              'target-arrow-color': '#ccc',
+              'target-arrow-shape': 'triangle',
+              'curve-style': 'bezier'
+            }
+          }
+        ],
+        layout: 
+        {
+          name: 'cose', 
+          animate: true 
+        }
+      });
+    }
+    let currentNodeId = 0; 
+    document.getElementById('node-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      currentNodeId++; 
+      const id = currentNodeId.toString(); 
+      const label = `${id}`; 
+      await addNode({ id });
+      renderGraph();
+    });
+
+    document.getElementById('edge-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const from = document.getElementById('edge-from').value;
+      const to = document.getElementById('edge-to').value;
+      const weight = parseInt(document.getElementById('edge-weight').value, 10);
+      await addEdge({ from, to, weight });
+      renderGraph();
+    });
+
+    renderGraph();
+  </script>
+  
+</body>
+</html>
